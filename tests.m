@@ -45,6 +45,17 @@ static int testsFailed = 0;
     } \
 } while (0)
 
+#define ASSERT_NOT_CONTAINS(haystack, needle, msg) do { \
+    NSString *_h = (haystack); \
+    NSString *_n = (needle); \
+    if (!_h || ![_h containsString:_n]) { \
+        testsPassed++; \
+    } else { \
+        testsFailed++; \
+        NSLog(@"FAIL: %s - [%@] should not contain [%@]", msg, _h, _n); \
+    } \
+} while (0)
+
 #pragma mark - MarkdownConverter Tests
 
 static void testBasicConversions(MarkdownConverter *converter) {
@@ -126,6 +137,112 @@ static void testImage(MarkdownConverter *converter) {
     ASSERT_CONTAINS(result, @"![photo](pic.png)", "image");
 }
 
+#pragma mark - Our Configuration Tests
+
+static void testScriptStyleStripping(MarkdownConverter *converter) {
+    // We configured remove(['script', 'style', 'noscript']) — verify it works
+    NSString *script = [converter convertHTMLToMarkdown:
+        @"<p>before</p><script>alert('xss')</script><p>after</p>"];
+    ASSERT_CONTAINS(script, @"before", "script: keeps text before");
+    ASSERT_CONTAINS(script, @"after", "script: keeps text after");
+    ASSERT_NOT_CONTAINS(script, @"alert", "script: strips script content");
+
+    NSString *style = [converter convertHTMLToMarkdown:
+        @"<style>.red { color: red; }</style><p>styled</p>"];
+    ASSERT_EQUAL(style, @"styled", "style: strips style tag entirely");
+
+    NSString *noscript = [converter convertHTMLToMarkdown:
+        @"<p>content</p><noscript>Enable JS</noscript>"];
+    ASSERT_NOT_CONTAINS(noscript, @"Enable JS", "noscript: strips noscript content");
+}
+
+static void testGFMTablePlugin(MarkdownConverter *converter) {
+    // We wired up turndownGfmPlugin — verify tables render as GFM markdown
+    NSString *result = [converter convertHTMLToMarkdown:
+        @"<table><thead><tr><th>Name</th><th>Age</th></tr></thead>"
+         "<tbody><tr><td>Alice</td><td>30</td></tr></tbody></table>"];
+    ASSERT_CONTAINS(result, @"| Name | Age |", "gfm table: header row");
+    ASSERT_CONTAINS(result, @"| --- | --- |", "gfm table: separator row");
+    ASSERT_CONTAINS(result, @"| Alice | 30 |", "gfm table: data row");
+}
+
+#pragma mark - JSContext Stability Tests
+
+static void testRepeatedConversions(MarkdownConverter *converter) {
+    // Verify the cached JSContext and function reference stay stable
+    for (int i = 0; i < 50; i++) {
+        NSString *html = [NSString stringWithFormat:@"<p>iteration %d</p>", i];
+        NSString *expected = [NSString stringWithFormat:@"iteration %d", i];
+        NSString *result = [converter convertHTMLToMarkdown:html];
+        if (![result isEqualToString:expected]) {
+            testsFailed++;
+            NSLog(@"FAIL: repeated conversion failed at iteration %d - expected [%@] got [%@]",
+                  i, expected, result);
+            return;
+        }
+    }
+    testsPassed++;
+}
+
+#pragma mark - ClipboardHelper Edge Case Tests
+
+static void testClipboardHTMLPreferredOverPlainText(void) {
+    // When clipboard has both HTML and plain text, readHTML should return the HTML
+    ClipboardHelper *helper = [[ClipboardHelper alloc] init];
+
+    NSPasteboard *pb = [NSPasteboard generalPasteboard];
+    [pb clearContents];
+    // Write both types — apps like browsers typically put both on the clipboard
+    [pb setString:@"<p>rich</p>" forType:NSPasteboardTypeHTML];
+    [pb setString:@"plain fallback" forType:NSPasteboardTypeString];
+
+    NSString *html = [helper readHTML];
+    ASSERT_EQUAL(html, @"<p>rich</p>", "clipboard prefers HTML over plain text");
+}
+
+static void testClipboardRTFFallback(void) {
+    // When clipboard has RTF but no HTML, readHTML should convert RTF to HTML
+    ClipboardHelper *helper = [[ClipboardHelper alloc] init];
+
+    // Create RTF data for "Hello" in bold
+    NSAttributedString *attr = [[NSAttributedString alloc]
+        initWithString:@"Hello"
+            attributes:@{NSFontAttributeName:
+                [NSFont boldSystemFontOfSize:12.0]}];
+    NSData *rtfData = [attr RTFFromRange:NSMakeRange(0, attr.length)
+                      documentAttributes:@{}];
+
+    NSPasteboard *pb = [NSPasteboard generalPasteboard];
+    [pb clearContents];
+    [pb setData:rtfData forType:NSPasteboardTypeRTF];
+
+    NSString *html = [helper readHTML];
+    ASSERT_NOT_NIL(html, "RTF fallback: returns non-nil HTML");
+    ASSERT_CONTAINS(html, @"Hello", "RTF fallback: contains text content");
+}
+
+static void testClipboardFullRoundTrip(MarkdownConverter *converter) {
+    // Integration test: put HTML on clipboard → read → convert → write → verify markdown
+    ClipboardHelper *helper = [[ClipboardHelper alloc] init];
+
+    NSPasteboard *pb = [NSPasteboard generalPasteboard];
+    [pb clearContents];
+    [pb setString:@"<h1>Title</h1><p>A <strong>bold</strong> paragraph.</p>"
+          forType:NSPasteboardTypeHTML];
+
+    NSString *html = [helper readHTML];
+    ASSERT_NOT_NIL(html, "round trip: read HTML");
+
+    NSString *markdown = [converter convertHTMLToMarkdown:html];
+    ASSERT_NOT_NIL(markdown, "round trip: conversion succeeded");
+
+    [helper writeMarkdown:markdown];
+
+    NSString *result = [pb stringForType:NSPasteboardTypeString];
+    ASSERT_CONTAINS(result, @"# Title", "round trip: has heading");
+    ASSERT_CONTAINS(result, @"**bold**", "round trip: has bold");
+}
+
 #pragma mark - ClipboardHelper Tests
 
 static void testClipboardWriteRead(void) {
@@ -192,10 +309,22 @@ int main(int argc, const char *argv[]) {
         testBlockquote(converter);
         testImage(converter);
 
+        NSLog(@"--- Our Configuration Tests ---");
+        testScriptStyleStripping(converter);
+        testGFMTablePlugin(converter);
+
+        NSLog(@"--- JSContext Stability Tests ---");
+        testRepeatedConversions(converter);
+
         NSLog(@"--- ClipboardHelper Tests ---");
         testClipboardWriteRead();
         testClipboardHTMLRead();
         testClipboardEmptyRead();
+
+        NSLog(@"--- ClipboardHelper Edge Case Tests ---");
+        testClipboardHTMLPreferredOverPlainText();
+        testClipboardRTFFallback();
+        testClipboardFullRoundTrip(converter);
 
         NSLog(@"=== Results: %d passed, %d failed ===", testsPassed, testsFailed);
 
