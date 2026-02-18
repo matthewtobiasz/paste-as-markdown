@@ -15,7 +15,7 @@
 - (void)applicationDidFinishLaunching:(NSNotification *)notification {
     _converter = [[MarkdownConverter alloc] init];
     if (!_converter) {
-        NSLog(@"[Copy to Markdown] Failed to initialize MarkdownConverter");
+        NSLog(@"[Paste as Markdown] Failed to initialize MarkdownConverter");
     }
     _clipboardHelper = [[ClipboardHelper alloc] init];
 
@@ -23,7 +23,7 @@
     _statusItem = [[NSStatusBar systemStatusBar] statusItemWithLength:NSVariableStatusItemLength];
 
     _defaultIcon = [NSImage imageWithSystemSymbolName:@"doc.on.clipboard"
-                             accessibilityDescription:@"Copy to Markdown"];
+                             accessibilityDescription:@"Paste as Markdown"];
     [_defaultIcon setTemplate:YES];
     _statusItem.button.image = _defaultIcon;
 

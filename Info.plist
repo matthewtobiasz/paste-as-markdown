@@ -4,11 +4,11 @@
 <plist version="1.0">
 <dict>
   <key>CFBundleName</key>
-  <string>Copy to Markdown</string>
+  <string>Paste as Markdown</string>
   <key>CFBundleDisplayName</key>
-  <string>Copy to Markdown</string>
+  <string>Paste as Markdown</string>
   <key>CFBundleIdentifier</key>
-  <string>com.tobiasz.copy-to-markdown</string>
+  <string>com.tobiasz.paste-as-markdown</string>
   <key>CFBundleVersion</key>
   <string>1.0</string>
   <key>CFBundleShortVersionString</key>
@@ -16,7 +16,7 @@
   <key>CFBundlePackageType</key>
   <string>APPL</string>
   <key>CFBundleExecutable</key>
-  <string>copy-to-markdown</string>
+  <string>paste-as-markdown</string>
   <key>LSMinimumSystemVersion</key>
   <string>11.0</string>
   <key>LSUIElement</key>

@@ -163,7 +163,7 @@ int main(int argc, const char *argv[]) {
     @autoreleasepool {
         [NSApplication sharedApplication];
 
-        NSLog(@"=== Copy to Markdown Tests ===");
+        NSLog(@"=== Paste as Markdown Tests ===");
 
         // Find the JS bundle relative to the test binary
         NSString *execPath = [[NSProcessInfo processInfo] arguments][0];

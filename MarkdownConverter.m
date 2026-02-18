@@ -9,7 +9,7 @@
 - (nullable instancetype)init {
     NSString *jsPath = [[NSBundle mainBundle] pathForResource:@"turndown-bundle" ofType:@"js"];
     if (!jsPath) {
-        NSLog(@"[Copy to Markdown] turndown-bundle.js not found in app resources");
+        NSLog(@"[Paste as Markdown] turndown-bundle.js not found in app resources");
         return nil;
     }
     return [self initWithJSBundlePath:jsPath];
@@ -21,7 +21,7 @@
 
     _context = [[JSContext alloc] init];
     _context.exceptionHandler = ^(JSContext *ctx, JSValue *exception) {
-        NSLog(@"[Copy to Markdown] JS Error: %@", exception);
+        NSLog(@"[Paste as Markdown] JS Error: %@", exception);
     };
 
     NSError *error = nil;
@@ -29,13 +29,13 @@
                                                 encoding:NSUTF8StringEncoding
                                                    error:&error];
     if (!jsCode) {
-        NSLog(@"[Copy to Markdown] Failed to read turndown-bundle.js: %@", error);
+        NSLog(@"[Paste as Markdown] Failed to read turndown-bundle.js: %@", error);
         return nil;
     }
 
     [_context evaluateScript:jsCode withSourceURL:[NSURL fileURLWithPath:path]];
     if (_context.exception) {
-        NSLog(@"[Copy to Markdown] Failed to evaluate turndown bundle: %@", _context.exception);
+        NSLog(@"[Paste as Markdown] Failed to evaluate turndown bundle: %@", _context.exception);
         _context.exception = nil;
         return nil;
     }
@@ -54,7 +54,7 @@
          "});";
     [_context evaluateScript:setupScript];
     if (_context.exception) {
-        NSLog(@"[Copy to Markdown] Failed to create TurndownService: %@", _context.exception);
+        NSLog(@"[Paste as Markdown] Failed to create TurndownService: %@", _context.exception);
         _context.exception = nil;
         return nil;
     }
@@ -63,7 +63,7 @@
     _convertFunction = [_context evaluateScript:
         @"(function(html) { return __turndownService.turndown(html); })"];
     if (!_convertFunction || [_convertFunction isUndefined]) {
-        NSLog(@"[Copy to Markdown] Failed to create convert function");
+        NSLog(@"[Paste as Markdown] Failed to create convert function");
         return nil;
     }
 
@@ -76,7 +76,7 @@
     JSValue *result = [_convertFunction callWithArguments:@[html]];
 
     if (_context.exception) {
-        NSLog(@"[Copy to Markdown] Conversion error: %@", _context.exception);
+        NSLog(@"[Paste as Markdown] Conversion error: %@", _context.exception);
         _context.exception = nil;
         return nil;
     }

@@ -27,7 +27,7 @@
                 return [[NSString alloc] initWithData:htmlData encoding:NSUTF8StringEncoding];
             }
             if (error) {
-                NSLog(@"[Copy to Markdown] RTF to HTML conversion error: %@", error);
+                NSLog(@"[Paste as Markdown] RTF to HTML conversion error: %@", error);
             }
         }
     }

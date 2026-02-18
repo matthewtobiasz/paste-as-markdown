@@ -1,6 +1,6 @@
-APP_NAME = Copy to Markdown
+APP_NAME = Paste as Markdown
 BUNDLE = $(APP_NAME).app
-EXECUTABLE = copy-to-markdown
+EXECUTABLE = paste-as-markdown
 
 CC = clang
 OBJC_FLAGS = -fobjc-arc -framework Cocoa -framework JavaScriptCore -mmacosx-version-min=11.0
