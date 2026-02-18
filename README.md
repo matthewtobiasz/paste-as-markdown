@@ -22,7 +22,17 @@ The app reads HTML from the macOS clipboard (with an RTF fallback), converts it 
 - Blockquotes and horizontal rules
 - Script/style tags are stripped automatically
 
-## Building
+## Installation
+
+### Download (recommended)
+
+1. Download the latest `PasteAsMarkdown-vX.X.X.zip` from [Releases](https://github.com/matthewtobiasz/paste-as-markdown/releases)
+2. Unzip and drag **Paste as Markdown.app** to `/Applications`
+3. Double-click to launch — the clipboard icon appears in your menu bar
+
+> **Note:** On first launch, macOS may say the app is from an unidentified developer. Go to **System Settings → Privacy & Security** and click **Open Anyway**.
+
+### Build from source
 
 Requires macOS 11+, Xcode command line tools, and Node.js (for bundling turndown.js at build time).
 
@@ -30,6 +40,7 @@ Requires macOS 11+, Xcode command line tools, and Node.js (for bundling turndown
 make        # install npm deps, bundle JS, compile Obj-C, assemble .app
 make run    # build and launch
 make test   # build and run unit tests
+make dist   # build and create PasteAsMarkdown.zip
 make clean  # remove build artifacts
 ```
 

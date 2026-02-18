@@ -7,7 +7,7 @@ OBJC_FLAGS = -fobjc-arc -framework Cocoa -framework JavaScriptCore -mmacosx-vers
 SRC = main.m MarkdownConverter.m ClipboardHelper.m
 TEST_SRC = tests.m MarkdownConverter.m ClipboardHelper.m
 
-.PHONY: all clean js bundle run test
+.PHONY: all clean js bundle run test dist
 
 all: js bundle
 
@@ -42,7 +42,12 @@ test: Resources/turndown-bundle.js
 	cp Resources/turndown-bundle.js build/
 	cd build && ./tests
 
+# Create a distributable ZIP
+dist: bundle
+	zip -r "PasteAsMarkdown.zip" "$(BUNDLE)"
+	@echo "Created PasteAsMarkdown.zip"
+
 clean:
 	rm -rf build "$(BUNDLE)"
-	rm -f Resources/turndown-bundle.js
+	rm -f Resources/turndown-bundle.js PasteAsMarkdown.zip
 	rm -rf js/node_modules
