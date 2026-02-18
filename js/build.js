@@ -1,4 +1,5 @@
 const esbuild = require('esbuild');
+const path = require('path');
 
 // Polyfills needed for domino to work in JavaScriptCore (no setTimeout/console)
 const polyfills = `
@@ -20,7 +21,7 @@ if (typeof console === 'undefined') {
 `;
 
 esbuild.buildSync({
-  entryPoints: [require.resolve('turndown')],
+  entryPoints: [path.join(__dirname, 'entry.js')],
   bundle: true,
   format: 'iife',
   globalName: 'TurndownModule',
@@ -31,7 +32,7 @@ esbuild.buildSync({
     js: polyfills
   },
   footer: {
-    js: 'var TurndownService = TurndownModule;'
+    js: 'var TurndownService = TurndownModule.TurndownService; var turndownGfmPlugin = TurndownModule.gfmPlugin;'
   }
 });
 

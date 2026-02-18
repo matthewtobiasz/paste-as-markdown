@@ -40,7 +40,7 @@
         return nil;
     }
 
-    // Create a configured TurndownService instance
+    // Create a configured TurndownService instance with GFM plugin
     NSString *setupScript =
         @"var __turndownService = new TurndownService({"
          "  headingStyle: 'atx',"
@@ -51,7 +51,9 @@
          "  emDelimiter: '*',"
          "  strongDelimiter: '**',"
          "  linkStyle: 'inlined'"
-         "});";
+         "});"
+         "__turndownService.use(turndownGfmPlugin);"
+         "__turndownService.remove(['script', 'style', 'noscript']);";
     [_context evaluateScript:setupScript];
     if (_context.exception) {
         NSLog(@"[Paste as Markdown] Failed to create TurndownService: %@", _context.exception);
