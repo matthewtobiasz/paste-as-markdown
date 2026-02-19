@@ -274,6 +274,50 @@ static void testClipboardEmptyRead(void) {
     ASSERT_NIL(html, "clipboard returns nil when no HTML/RTF");
 }
 
+#pragma mark - Plain Text Fallback Tests
+
+static void testReadPlainText(void) {
+    ClipboardHelper *helper = [[ClipboardHelper alloc] init];
+
+    NSPasteboard *pb = [NSPasteboard generalPasteboard];
+    [pb clearContents];
+    [pb setString:@"just some text" forType:NSPasteboardTypeString];
+
+    NSString *text = [helper readPlainText];
+    ASSERT_EQUAL(text, @"just some text", "readPlainText returns plain text");
+}
+
+static void testReadPlainTextReturnsNilWhenEmpty(void) {
+    ClipboardHelper *helper = [[ClipboardHelper alloc] init];
+
+    NSPasteboard *pb = [NSPasteboard generalPasteboard];
+    [pb clearContents];
+
+    NSString *text = [helper readPlainText];
+    ASSERT_NIL(text, "readPlainText returns nil on empty clipboard");
+}
+
+static void testPlainTextPassthroughRoundTrip(void) {
+    ClipboardHelper *helper = [[ClipboardHelper alloc] init];
+
+    NSPasteboard *pb = [NSPasteboard generalPasteboard];
+    [pb clearContents];
+    [pb setString:@"already markdown **bold**" forType:NSPasteboardTypeString];
+
+    // readHTML should return nil (no HTML/RTF)
+    NSString *html = [helper readHTML];
+    ASSERT_NIL(html, "plain text passthrough: readHTML returns nil");
+
+    // readPlainText should return the text
+    NSString *plain = [helper readPlainText];
+    ASSERT_NOT_NIL(plain, "plain text passthrough: readPlainText returns text");
+
+    // Write it back and verify
+    [helper writeMarkdown:plain];
+    NSString *result = [pb stringForType:NSPasteboardTypeString];
+    ASSERT_EQUAL(result, @"already markdown **bold**", "plain text passthrough: text unchanged");
+}
+
 #pragma mark - Main
 
 int main(int argc, const char *argv[]) {
@@ -325,6 +369,11 @@ int main(int argc, const char *argv[]) {
         testClipboardHTMLPreferredOverPlainText();
         testClipboardRTFFallback();
         testClipboardFullRoundTrip(converter);
+
+        NSLog(@"--- Plain Text Fallback Tests ---");
+        testReadPlainText();
+        testReadPlainTextReturnsNilWhenEmpty();
+        testPlainTextPassthroughRoundTrip();
 
         NSLog(@"=== Results: %d passed, %d failed ===", testsPassed, testsFailed);
 

@@ -14,8 +14,8 @@ all: js bundle
 # Step 1: Build the JS bundle (turndown + domino)
 js: Resources/turndown-bundle.js
 
-Resources/turndown-bundle.js: js/package.json js/build.js
-	cd js && npm install --silent && node build.js
+Resources/turndown-bundle.js: js/package.json js/build.js js/entry.js js/converter.js
+	cd js && npm ci --silent && node build.js
 
 # Step 2: Compile the Objective-C binary
 build/$(EXECUTABLE): $(SRC) src/MarkdownConverter.h src/ClipboardHelper.h

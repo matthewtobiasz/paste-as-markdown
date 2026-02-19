@@ -35,6 +35,15 @@
     return nil;
 }
 
+- (nullable NSString *)readPlainText {
+    NSPasteboard *pb = [NSPasteboard generalPasteboard];
+    NSString *text = [pb stringForType:NSPasteboardTypeString];
+    if (text && text.length > 0) {
+        return text;
+    }
+    return nil;
+}
+
 - (void)writeMarkdown:(NSString *)markdown {
     NSPasteboard *pb = [NSPasteboard generalPasteboard];
     [pb clearContents];

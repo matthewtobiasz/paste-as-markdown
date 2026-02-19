@@ -32,7 +32,7 @@ esbuild.buildSync({
     js: polyfills
   },
   footer: {
-    js: 'var TurndownService = TurndownModule.TurndownService; var turndownGfmPlugin = TurndownModule.gfmPlugin;'
+    js: 'var convert = TurndownModule.convert;'
   }
 });
 

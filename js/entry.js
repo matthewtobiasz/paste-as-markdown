@@ -1,4 +1,3 @@
-var TurndownService = require('turndown');
-var gfm = require('turndown-plugin-gfm');
+var converter = require('./converter');
 
-module.exports = { TurndownService: TurndownService, gfmPlugin: gfm.gfm };
+module.exports = { convert: converter.convert };

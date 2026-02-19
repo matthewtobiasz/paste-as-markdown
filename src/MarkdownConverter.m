@@ -40,32 +40,10 @@
         return nil;
     }
 
-    // Create a configured TurndownService instance with GFM plugin
-    NSString *setupScript =
-        @"var __turndownService = new TurndownService({"
-         "  headingStyle: 'atx',"
-         "  hr: '---',"
-         "  bulletListMarker: '-',"
-         "  codeBlockStyle: 'fenced',"
-         "  fence: '```',"
-         "  emDelimiter: '*',"
-         "  strongDelimiter: '**',"
-         "  linkStyle: 'inlined'"
-         "});"
-         "__turndownService.use(turndownGfmPlugin);"
-         "__turndownService.remove(['script', 'style', 'noscript']);";
-    [_context evaluateScript:setupScript];
-    if (_context.exception) {
-        NSLog(@"[Paste as Markdown] Failed to create TurndownService: %@", _context.exception);
-        _context.exception = nil;
-        return nil;
-    }
-
-    // Cache a function reference for efficient repeated calls
-    _convertFunction = [_context evaluateScript:
-        @"(function(html) { return __turndownService.turndown(html); })"];
+    // The bundle exports a global convert(html) function
+    _convertFunction = _context[@"convert"];
     if (!_convertFunction || [_convertFunction isUndefined]) {
-        NSLog(@"[Paste as Markdown] Failed to create convert function");
+        NSLog(@"[Paste as Markdown] Failed to find convert function in bundle");
         return nil;
     }
 

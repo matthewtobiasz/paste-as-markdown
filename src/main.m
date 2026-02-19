@@ -54,7 +54,14 @@
 
     NSString *html = [_clipboardHelper readHTML];
     if (!html) {
-        [self flashStatusIcon:@"exclamationmark.triangle"];
+        // No HTML/RTF — pass plain text through unchanged
+        NSString *plain = [_clipboardHelper readPlainText];
+        if (plain) {
+            [_clipboardHelper writeMarkdown:plain];
+            [self flashStatusIcon:@"minus"];
+        } else {
+            [self flashStatusIcon:@"exclamationmark.triangle"];
+        }
         return;
     }
 
