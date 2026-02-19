@@ -20,6 +20,10 @@ if (typeof console === 'undefined') {
 }
 `;
 
+// We bundle with platform:"node" so esbuild pulls in domino, which provides
+// the DOM APIs (Document, Element, …) that are absent in JavaScriptCore.
+// The output still runs inside JSC — esbuild resolves all require() calls at
+// build time, so no Node runtime is needed. Don't change this to "browser".
 esbuild.buildSync({
   entryPoints: [path.join(__dirname, 'entry.js')],
   bundle: true,
