@@ -38,6 +38,14 @@
 
     [menu addItem:[NSMenuItem separatorItem]];
 
+    NSMenuItem *aboutItem = [[NSMenuItem alloc] initWithTitle:@"About Paste as Markdown"
+                                                      action:@selector(showAbout:)
+                                               keyEquivalent:@""];
+    [aboutItem setTarget:self];
+    [menu addItem:aboutItem];
+
+    [menu addItem:[NSMenuItem separatorItem]];
+
     NSMenuItem *quitItem = [[NSMenuItem alloc] initWithTitle:@"Quit"
                                                      action:@selector(terminate:)
                                               keyEquivalent:@"q"];
@@ -73,6 +81,28 @@
     // Clipboard is only cleared here, once we have a confirmed result
     BOOL ok = [_clipboardHelper replaceClipboardWithMarkdown:markdown];
     [self flashStatusIcon:ok ? @"checkmark" : @"xmark"];
+}
+
+- (void)showAbout:(id)sender {
+    NSString *version = [[NSBundle mainBundle] objectForInfoDictionaryKey:@"CFBundleShortVersionString"];
+    if (!version) version = @"unknown";
+
+    NSAlert *alert = [[NSAlert alloc] init];
+    alert.messageText = @"Paste as Markdown";
+    alert.informativeText = [NSString stringWithFormat:
+        @"Version %@\n\nhttps://github.com/matthewtobiasz/paste-as-markdown", version];
+    alert.icon = [NSImage imageNamed:NSImageNameApplicationIcon];
+    [alert addButtonWithTitle:@"Open GitHub"];
+    [alert addButtonWithTitle:@"OK"];
+
+    // Bring the app to the foreground so the alert is visible
+    [NSApp activateIgnoringOtherApps:YES];
+
+    NSModalResponse response = [alert runModal];
+    if (response == NSAlertFirstButtonReturn) {
+        [[NSWorkspace sharedWorkspace] openURL:
+            [NSURL URLWithString:@"https://github.com/matthewtobiasz/paste-as-markdown"]];
+    }
 }
 
 - (void)flashStatusIcon:(NSString *)symbolName {
