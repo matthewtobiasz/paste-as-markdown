@@ -49,16 +49,18 @@ The built app is at `Paste as Markdown.app` — drag it to `/Applications` or ru
 ## Project structure
 
 ```
-main.m                  App entry point, menu bar setup, conversion action
-MarkdownConverter.h/m   JSContext bridge to turndown.js
-ClipboardHelper.h/m     NSPasteboard read (HTML/RTF) and write (plain text)
-tests.m                 Unit tests
-Info.plist              App metadata (LSUIElement=YES hides dock icon)
-Makefile                Build system
+src/
+  main.m                App entry point, menu bar setup, conversion action
+  MarkdownConverter.h/m JSContext bridge to turndown.js
+  ClipboardHelper.h/m   NSPasteboard read (HTML/RTF) and write (plain text)
+  Info.plist            App metadata (LSUIElement=YES hides dock icon)
+test/
+  tests.m               Unit tests
 js/
   package.json          npm dependencies (turndown, turndown-plugin-gfm, esbuild)
   entry.js              Bundle entry point for esbuild
   build.js              esbuild config — produces Resources/turndown-bundle.js
+Makefile                Build system
 ```
 
 The JS bundle (~590KB) is generated at build time and embedded in the app. At runtime there are no external dependencies — the app is fully self-contained.

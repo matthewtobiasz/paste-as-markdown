@@ -3,9 +3,9 @@ BUNDLE = $(APP_NAME).app
 EXECUTABLE = paste-as-markdown
 
 CC = clang
-OBJC_FLAGS = -fobjc-arc -framework Cocoa -framework JavaScriptCore -mmacosx-version-min=11.0
-SRC = main.m MarkdownConverter.m ClipboardHelper.m
-TEST_SRC = tests.m MarkdownConverter.m ClipboardHelper.m
+OBJC_FLAGS = -fobjc-arc -framework Cocoa -framework JavaScriptCore -mmacosx-version-min=11.0 -Isrc
+SRC = src/main.m src/MarkdownConverter.m src/ClipboardHelper.m
+TEST_SRC = test/tests.m src/MarkdownConverter.m src/ClipboardHelper.m
 
 .PHONY: all clean js bundle run test dist
 
@@ -18,16 +18,16 @@ Resources/turndown-bundle.js: js/package.json js/build.js
 	cd js && npm install --silent && node build.js
 
 # Step 2: Compile the Objective-C binary
-build/$(EXECUTABLE): $(SRC) MarkdownConverter.h ClipboardHelper.h
+build/$(EXECUTABLE): $(SRC) src/MarkdownConverter.h src/ClipboardHelper.h
 	@mkdir -p build
 	$(CC) $(OBJC_FLAGS) -o $@ $(SRC)
 
 # Step 3: Assemble the .app bundle
-bundle: build/$(EXECUTABLE) Resources/turndown-bundle.js Info.plist
+bundle: build/$(EXECUTABLE) Resources/turndown-bundle.js src/Info.plist
 	@mkdir -p "$(BUNDLE)/Contents/MacOS"
 	@mkdir -p "$(BUNDLE)/Contents/Resources"
 	cp build/$(EXECUTABLE) "$(BUNDLE)/Contents/MacOS/"
-	cp Info.plist "$(BUNDLE)/Contents/"
+	cp src/Info.plist "$(BUNDLE)/Contents/"
 	cp Resources/turndown-bundle.js "$(BUNDLE)/Contents/Resources/"
 	codesign --force --deep --sign - "$(BUNDLE)"
 
