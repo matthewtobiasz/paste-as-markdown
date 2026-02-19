@@ -56,22 +56,23 @@
     if (!html) {
         // No HTML/RTF — pass plain text through unchanged
         NSString *plain = [_clipboardHelper readPlainText];
-        if (plain) {
-            [_clipboardHelper writeMarkdown:plain];
-            [self flashStatusIcon:@"minus"];
-        } else {
+        if (!plain) {
             [self flashStatusIcon:@"exclamationmark.triangle"];
+            return;
         }
+        BOOL ok = [_clipboardHelper replaceClipboardWithMarkdown:plain];
+        [self flashStatusIcon:ok ? @"minus" : @"xmark"];
         return;
     }
 
     NSString *markdown = [_converter convertHTMLToMarkdown:html];
-    if (markdown) {
-        [_clipboardHelper writeMarkdown:markdown];
-        [self flashStatusIcon:@"checkmark"];
-    } else {
+    if (!markdown) {
         [self flashStatusIcon:@"xmark"];
+        return;
     }
+    // Clipboard is only cleared here, once we have a confirmed result
+    BOOL ok = [_clipboardHelper replaceClipboardWithMarkdown:markdown];
+    [self flashStatusIcon:ok ? @"checkmark" : @"xmark"];
 }
 
 - (void)flashStatusIcon:(NSString *)symbolName {

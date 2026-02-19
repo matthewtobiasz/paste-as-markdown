@@ -236,7 +236,7 @@ static void testClipboardFullRoundTrip(MarkdownConverter *converter) {
     NSString *markdown = [converter convertHTMLToMarkdown:html];
     ASSERT_NOT_NIL(markdown, "round trip: conversion succeeded");
 
-    [helper writeMarkdown:markdown];
+    [helper replaceClipboardWithMarkdown:markdown];
 
     NSString *result = [pb stringForType:NSPasteboardTypeString];
     ASSERT_CONTAINS(result, @"# Title", "round trip: has heading");
@@ -247,7 +247,7 @@ static void testClipboardFullRoundTrip(MarkdownConverter *converter) {
 
 static void testClipboardWriteRead(void) {
     ClipboardHelper *helper = [[ClipboardHelper alloc] init];
-    [helper writeMarkdown:@"# Hello\n\nWorld"];
+    [helper replaceClipboardWithMarkdown:@"# Hello\n\nWorld"];
     NSString *text = [[NSPasteboard generalPasteboard] stringForType:NSPasteboardTypeString];
     ASSERT_EQUAL(text, @"# Hello\n\nWorld", "clipboard write/read plain text");
 }
@@ -313,7 +313,7 @@ static void testPlainTextPassthroughRoundTrip(void) {
     ASSERT_NOT_NIL(plain, "plain text passthrough: readPlainText returns text");
 
     // Write it back and verify
-    [helper writeMarkdown:plain];
+    [helper replaceClipboardWithMarkdown:plain];
     NSString *result = [pb stringForType:NSPasteboardTypeString];
     ASSERT_EQUAL(result, @"already markdown **bold**", "plain text passthrough: text unchanged");
 }

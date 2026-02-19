@@ -4,6 +4,8 @@
 
 - (nullable NSString *)readHTML;
 - (nullable NSString *)readPlainText;
-- (void)writeMarkdown:(nonnull NSString *)markdown;
+/// Atomically clears the pasteboard and writes the given string.
+/// Returns YES on success. The pasteboard is only cleared if the write succeeds.
+- (BOOL)replaceClipboardWithMarkdown:(nonnull NSString *)markdown;
 
 @end

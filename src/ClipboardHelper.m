@@ -44,10 +44,10 @@
     return nil;
 }
 
-- (void)writeMarkdown:(NSString *)markdown {
+- (BOOL)replaceClipboardWithMarkdown:(NSString *)markdown {
     NSPasteboard *pb = [NSPasteboard generalPasteboard];
     [pb clearContents];
-    [pb setString:markdown forType:NSPasteboardTypeString];
+    return [pb setString:markdown forType:NSPasteboardTypeString];
 }
 
 @end
