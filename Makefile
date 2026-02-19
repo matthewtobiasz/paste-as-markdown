@@ -23,11 +23,20 @@ build/$(EXECUTABLE): $(SRC) src/MarkdownConverter.h src/ClipboardHelper.h
 	$(CC) $(OBJC_FLAGS) -o $@ $(SRC)
 
 # Step 3: Assemble the .app bundle
+# Versions are stamped from git tags at build time — no manual bumping needed.
+# CFBundleShortVersionString = marketing version (e.g. 0.1.3)
+# CFBundleVersion = full build version (e.g. 0.1.3 at tag, 0.1.3.2.gabcdef after)
+GIT_DESCRIBE := $(shell git describe --tags --always 2>/dev/null || echo v0.0.0)
+VERSION := $(shell echo "$(GIT_DESCRIBE)" | sed 's/^v//' | sed 's/-.*//')
+BUILD_VERSION := $(shell echo "$(GIT_DESCRIBE)" | sed 's/^v//' | sed 's/-/./g')
+
 bundle: build/$(EXECUTABLE) Resources/turndown-bundle.js src/Info.plist
 	@mkdir -p "$(BUNDLE)/Contents/MacOS"
 	@mkdir -p "$(BUNDLE)/Contents/Resources"
 	cp build/$(EXECUTABLE) "$(BUNDLE)/Contents/MacOS/"
 	cp src/Info.plist "$(BUNDLE)/Contents/"
+	/usr/libexec/PlistBuddy -c "Set :CFBundleShortVersionString $(VERSION)" "$(BUNDLE)/Contents/Info.plist"
+	/usr/libexec/PlistBuddy -c "Set :CFBundleVersion $(BUILD_VERSION)" "$(BUNDLE)/Contents/Info.plist"
 	cp Resources/turndown-bundle.js "$(BUNDLE)/Contents/Resources/"
 	cp Resources/AppIcon.icns "$(BUNDLE)/Contents/Resources/"
 	codesign --force --deep --sign - "$(BUNDLE)"

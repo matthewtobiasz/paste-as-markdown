@@ -86,10 +86,18 @@
 - (void)showAbout:(id)sender {
     NSString *version = [[NSBundle mainBundle] objectForInfoDictionaryKey:@"CFBundleShortVersionString"];
     if (!version) version = @"unknown";
+    NSString *build = [[NSBundle mainBundle] objectForInfoDictionaryKey:@"CFBundleVersion"];
+
+    NSString *versionText;
+    if (build && ![build isEqualToString:version]) {
+        versionText = [NSString stringWithFormat:@"Version %@ (%@)", version, build];
+    } else {
+        versionText = [NSString stringWithFormat:@"Version %@", version];
+    }
 
     NSAlert *alert = [[NSAlert alloc] init];
     alert.messageText = @"Paste as Markdown";
-    alert.informativeText = [NSString stringWithFormat:@"Version %@", version];
+    alert.informativeText = versionText;
     alert.icon = [NSImage imageNamed:NSImageNameApplicationIcon];
     [alert addButtonWithTitle:@"Open GitHub"];
     [alert addButtonWithTitle:@"OK"];
