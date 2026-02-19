@@ -29,6 +29,7 @@ bundle: build/$(EXECUTABLE) Resources/turndown-bundle.js src/Info.plist
 	cp build/$(EXECUTABLE) "$(BUNDLE)/Contents/MacOS/"
 	cp src/Info.plist "$(BUNDLE)/Contents/"
 	cp Resources/turndown-bundle.js "$(BUNDLE)/Contents/Resources/"
+	cp Resources/AppIcon.icns "$(BUNDLE)/Contents/Resources/"
 	codesign --force --deep --sign - "$(BUNDLE)"
 
 # Run the app
