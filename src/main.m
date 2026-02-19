@@ -89,8 +89,7 @@
 
     NSAlert *alert = [[NSAlert alloc] init];
     alert.messageText = @"Paste as Markdown";
-    alert.informativeText = [NSString stringWithFormat:
-        @"Version %@\n\nhttps://github.com/matthewtobiasz/paste-as-markdown", version];
+    alert.informativeText = [NSString stringWithFormat:@"Version %@", version];
     alert.icon = [NSImage imageNamed:NSImageNameApplicationIcon];
     [alert addButtonWithTitle:@"Open GitHub"];
     [alert addButtonWithTitle:@"OK"];
