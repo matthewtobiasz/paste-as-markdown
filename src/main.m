@@ -22,9 +22,18 @@
     // Create menu bar item
     _statusItem = [[NSStatusBar systemStatusBar] statusItemWithLength:NSVariableStatusItemLength];
 
-    _defaultIcon = [NSImage imageWithSystemSymbolName:@"doc.on.clipboard"
-                             accessibilityDescription:@"Paste as Markdown"];
+    // Load menu bar icon from bundle Resources (MenuBarIcon.png / @2x)
+    NSString *iconPath = [[NSBundle mainBundle] pathForResource:@"MenuBarIcon" ofType:@"png"];
+    if (iconPath) {
+        _defaultIcon = [[NSImage alloc] initWithContentsOfFile:iconPath];
+    }
+    if (!_defaultIcon) {
+        // Fallback to SF Symbol if custom icon not found (e.g. in tests)
+        _defaultIcon = [NSImage imageWithSystemSymbolName:@"number"
+                                 accessibilityDescription:@"Paste as Markdown"];
+    }
     [_defaultIcon setTemplate:YES];
+    [_defaultIcon setSize:NSMakeSize(18, 18)];
     _statusItem.button.image = _defaultIcon;
 
     // Build menu

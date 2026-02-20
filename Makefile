@@ -39,6 +39,8 @@ bundle: build/$(EXECUTABLE) Resources/turndown-bundle.js src/Info.plist
 	/usr/libexec/PlistBuddy -c "Set :CFBundleVersion $(BUILD_VERSION)" "$(BUNDLE)/Contents/Info.plist"
 	cp Resources/turndown-bundle.js "$(BUNDLE)/Contents/Resources/"
 	cp Resources/AppIcon.icns "$(BUNDLE)/Contents/Resources/"
+	cp Resources/MenuBarIcon.png "$(BUNDLE)/Contents/Resources/"
+	cp "Resources/MenuBarIcon@2x.png" "$(BUNDLE)/Contents/Resources/"
 	codesign --force --deep --sign - "$(BUNDLE)"
 
 # Run the app
