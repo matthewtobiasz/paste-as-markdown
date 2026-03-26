@@ -13,9 +13,13 @@
 }
 
 - (void)applicationDidFinishLaunching:(NSNotification *)notification {
+    NSLog(@"[Paste as Markdown] applicationDidFinishLaunching called");
+
     _converter = [[MarkdownConverter alloc] init];
     if (!_converter) {
-        NSLog(@"[Paste as Markdown] Failed to initialize MarkdownConverter");
+        NSLog(@"[Paste as Markdown] Failed to initialize MarkdownConverter — clipboard conversion will not work");
+    } else {
+        NSLog(@"[Paste as Markdown] MarkdownConverter initialized successfully");
     }
     _clipboardHelper = [[ClipboardHelper alloc] init];
 
@@ -61,6 +65,12 @@
     [menu addItem:quitItem];
 
     _statusItem.menu = menu;
+
+    NSLog(@"[Paste as Markdown] Menu bar item created — app is running");
+}
+
+- (void)applicationWillTerminate:(NSNotification *)notification {
+    NSLog(@"[Paste as Markdown] App is shutting down");
 }
 
 - (void)convertClipboard:(id)sender {
@@ -137,6 +147,8 @@
 
 int main(int argc, const char *argv[]) {
     @autoreleasepool {
+        NSLog(@"[Paste as Markdown] App process started");
+
         NSApplication *app = [NSApplication sharedApplication];
         [app setActivationPolicy:NSApplicationActivationPolicyAccessory];
 
