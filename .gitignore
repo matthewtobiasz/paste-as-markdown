@@ -1,4 +1,6 @@
 build/
+tools/clipboard-dump/
+.DS_Store
 Paste as Markdown.app/
 Resources/turndown-bundle.js
 js/node_modules/

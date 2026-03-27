@@ -164,6 +164,89 @@ static void testGFMTablePlugin(MarkdownConverter *converter) {
     ASSERT_CONTAINS(result, @"| Name | Age |", "gfm table: header row");
     ASSERT_CONTAINS(result, @"| --- | --- |", "gfm table: separator row");
     ASSERT_CONTAINS(result, @"| Alice | 30 |", "gfm table: data row");
+    ASSERT_NOT_CONTAINS(result, @"<table", "gfm table: no HTML table tag");
+    ASSERT_NOT_CONTAINS(result, @"<tr", "gfm table: no HTML tr tag");
+    ASSERT_NOT_CONTAINS(result, @"<td", "gfm table: no HTML td tag");
+    ASSERT_NOT_CONTAINS(result, @"<th", "gfm table: no HTML th tag");
+}
+
+static void testTableMultipleRows(MarkdownConverter *converter) {
+    NSString *result = [converter convertHTMLToMarkdown:
+        @"<table><thead><tr><th>Col1</th><th>Col2</th><th>Col3</th></tr></thead>"
+         "<tbody>"
+         "<tr><td>A</td><td>B</td><td>C</td></tr>"
+         "<tr><td>D</td><td>E</td><td>F</td></tr>"
+         "</tbody></table>"];
+    ASSERT_CONTAINS(result, @"| Col1 | Col2 | Col3 |", "table multi-row: header row");
+    ASSERT_CONTAINS(result, @"| --- | --- | --- |", "table multi-row: separator row");
+    ASSERT_CONTAINS(result, @"| A | B | C |", "table multi-row: first data row");
+    ASSERT_CONTAINS(result, @"| D | E | F |", "table multi-row: second data row");
+    ASSERT_NOT_CONTAINS(result, @"<table", "table multi-row: no HTML table tag");
+    ASSERT_NOT_CONTAINS(result, @"<td", "table multi-row: no HTML td tag");
+}
+
+static void testTableNoThead(MarkdownConverter *converter) {
+    // Tables without explicit thead — GFM plugin should still produce markdown
+    NSString *result = [converter convertHTMLToMarkdown:
+        @"<table>"
+         "<tr><th>Product</th><th>Price</th></tr>"
+         "<tr><td>Apple</td><td>1.00</td></tr>"
+         "</table>"];
+    ASSERT_NOT_CONTAINS(result, @"<table", "table no-thead: no HTML table tag");
+    ASSERT_NOT_CONTAINS(result, @"<td", "table no-thead: no HTML td tag");
+    ASSERT_CONTAINS(result, @"|", "table no-thead: uses pipe delimiters");
+}
+
+static void testTableWithInlineFormatting(MarkdownConverter *converter) {
+    // Cell content with bold/links should be converted, not left as HTML
+    NSString *result = [converter convertHTMLToMarkdown:
+        @"<table><thead><tr><th>Name</th><th>Note</th></tr></thead>"
+         "<tbody><tr><td><strong>Bob</strong></td><td><em>important</em></td></tr></tbody></table>"];
+    ASSERT_CONTAINS(result, @"| Name | Note |", "table inline: header row");
+    ASSERT_CONTAINS(result, @"**Bob**", "table inline: bold converted");
+    ASSERT_CONTAINS(result, @"*important*", "table inline: italic converted");
+    ASSERT_NOT_CONTAINS(result, @"<strong>", "table inline: no HTML strong tag");
+    ASSERT_NOT_CONTAINS(result, @"<em>", "table inline: no HTML em tag");
+    ASSERT_NOT_CONTAINS(result, @"<td", "table inline: no HTML td tag");
+}
+
+static void testTableWithLink(MarkdownConverter *converter) {
+    NSString *result = [converter convertHTMLToMarkdown:
+        @"<table><thead><tr><th>Site</th><th>URL</th></tr></thead>"
+         "<tbody><tr><td>Example</td><td><a href=\"https://example.com\">link</a></td></tr></tbody></table>"];
+    ASSERT_CONTAINS(result, @"| Site | URL |", "table link: header row");
+    ASSERT_CONTAINS(result, @"[link](https://example.com)", "table link: link converted");
+    ASSERT_NOT_CONTAINS(result, @"<a href", "table link: no HTML anchor tag");
+    ASSERT_NOT_CONTAINS(result, @"<td", "table link: no HTML td tag");
+}
+
+static void testTableEmptyCells(MarkdownConverter *converter) {
+    NSString *result = [converter convertHTMLToMarkdown:
+        @"<table><thead><tr><th>A</th><th>B</th></tr></thead>"
+         "<tbody><tr><td></td><td>value</td></tr></tbody></table>"];
+    ASSERT_CONTAINS(result, @"| A | B |", "table empty cell: header row");
+    ASSERT_CONTAINS(result, @"|", "table empty cell: uses pipe delimiters");
+    ASSERT_NOT_CONTAINS(result, @"<td", "table empty cell: no HTML td tag");
+}
+
+static void testConfluenceTableNoThead(MarkdownConverter *converter) {
+    // Confluence copies tables with <td> everywhere — no <thead> or <th>.
+    // The GFM plugin must still produce markdown, not pass through raw HTML.
+    NSString *result = [converter convertHTMLToMarkdown:
+        @"<div class=\"tableView-content-wrap\"><div class=\"pm-table-wrapper\">"
+         "<table><tbody>"
+         "<tr><td><p><strong>Lorem</strong></p></td><td><p><strong>Ipsum</strong></p></td><td><p><strong>Dolor</strong></p></td></tr>"
+         "<tr><td><ol start=\"1\"><li><p><strong>Sit Amet</strong></p></li></ol></td>"
+              "<td><p>Lorem ipsum dolor sit amet</p></td>"
+              "<td><p><a href=\"https://example.com\"><strong>Consectetur Adipiscing</strong></a></p></td></tr>"
+         "</tbody></table>"
+         "</div></div>"];
+    ASSERT_NOT_CONTAINS(result, @"<table", "confluence table: no HTML table tag");
+    ASSERT_NOT_CONTAINS(result, @"<td",    "confluence table: no HTML td tag");
+    ASSERT_NOT_CONTAINS(result, @"<tr",    "confluence table: no HTML tr tag");
+    ASSERT_CONTAINS(result, @"|",          "confluence table: uses pipe delimiters");
+    ASSERT_CONTAINS(result, @"Lorem",      "confluence table: header cell text present");
+    ASSERT_CONTAINS(result, @"Sit Amet",   "confluence table: data cell text present");
 }
 
 #pragma mark - JSContext Stability Tests
@@ -356,6 +439,12 @@ int main(int argc, const char *argv[]) {
         NSLog(@"--- Our Configuration Tests ---");
         testScriptStyleStripping(converter);
         testGFMTablePlugin(converter);
+        testTableMultipleRows(converter);
+        testTableNoThead(converter);
+        testTableWithInlineFormatting(converter);
+        testTableWithLink(converter);
+        testTableEmptyCells(converter);
+        testConfluenceTableNoThead(converter);
 
         NSLog(@"--- JSContext Stability Tests ---");
         testRepeatedConversions(converter);
