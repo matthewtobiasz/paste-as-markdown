@@ -4,6 +4,7 @@
 @implementation MarkdownConverter {
     JSContext *_context;
     JSValue *_convertFunction;
+    dispatch_queue_t _jsQueue;
 }
 
 - (nullable instancetype)init {
@@ -19,9 +20,13 @@
     self = [super init];
     if (!self) return nil;
 
+    _jsQueue = dispatch_queue_create("com.pasteAsMarkdown.jsContext", DISPATCH_QUEUE_SERIAL);
     _context = [[JSContext alloc] init];
     _context.exceptionHandler = ^(JSContext *ctx, JSValue *exception) {
-        NSLog(@"[Paste as Markdown] JS Error: %@", exception);
+        // Log the exception type only — not the message or stack, which may
+        // contain clipboard content passed as input to the converter.
+        NSString *exceptionType = [exception[@"name"] toString] ?: @"unknown";
+        NSLog(@"[Paste as Markdown] JS exception (%@) during conversion", exceptionType);
     };
 
     NSError *error = nil;
@@ -35,6 +40,7 @@
 
     [_context evaluateScript:jsCode withSourceURL:[NSURL fileURLWithPath:path]];
     if (_context.exception) {
+        // Safe to log the bundle evaluation error — it's from our own resource, not clipboard input.
         NSLog(@"[Paste as Markdown] Failed to evaluate turndown bundle: %@", _context.exception);
         _context.exception = nil;
         return nil;
@@ -53,10 +59,34 @@
 - (nullable NSString *)convertHTMLToMarkdown:(NSString *)html {
     if (!html || html.length == 0) return nil;
 
-    JSValue *result = [_convertFunction callWithArguments:@[html]];
+    // Guard against extremely large clipboard content that could exhaust memory
+    // or cause the JS engine to hang. 5 MB covers any realistic rich-text copy.
+    const NSUInteger kMaxInputBytes = 5 * 1024 * 1024;
+    if ([html lengthOfBytesUsingEncoding:NSUTF8StringEncoding] > kMaxInputBytes) {
+        NSLog(@"[Paste as Markdown] Input too large (%lu bytes), skipping conversion",
+              (unsigned long)[html lengthOfBytesUsingEncoding:NSUTF8StringEncoding]);
+        return nil;
+    }
+
+    // Run the conversion on the dedicated JS serial queue so we can enforce a
+    // timeout while keeping JSContext access single-threaded (it is not thread-safe).
+    __block JSValue *result = nil;
+    dispatch_semaphore_t sem = dispatch_semaphore_create(0);
+
+    dispatch_async(_jsQueue, ^{
+        result = [self->_convertFunction callWithArguments:@[html]];
+        dispatch_semaphore_signal(sem);
+    });
+
+    const int64_t kTimeoutSeconds = 10;
+    if (dispatch_semaphore_wait(sem, dispatch_time(DISPATCH_TIME_NOW, kTimeoutSeconds * NSEC_PER_SEC)) != 0) {
+        NSLog(@"[Paste as Markdown] Conversion timed out after %llds", kTimeoutSeconds);
+        return nil;
+    }
 
     if (_context.exception) {
-        NSLog(@"[Paste as Markdown] Conversion error: %@", _context.exception);
+        // Do not log the exception message — it may contain clipboard content.
+        NSLog(@"[Paste as Markdown] Conversion failed with a JS exception");
         _context.exception = nil;
         return nil;
     }

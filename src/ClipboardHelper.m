@@ -46,8 +46,14 @@
 
 - (BOOL)replaceClipboardWithMarkdown:(NSString *)markdown {
     NSPasteboard *pb = [NSPasteboard generalPasteboard];
+    // NSPasteboard requires clearing before writing. Log if the write fails
+    // so the caller knows the clipboard may now be empty.
     [pb clearContents];
-    return [pb setString:markdown forType:NSPasteboardTypeString];
+    BOOL success = [pb setString:markdown forType:NSPasteboardTypeString];
+    if (!success) {
+        NSLog(@"[Paste as Markdown] Failed to write markdown to clipboard");
+    }
+    return success;
 }
 
 @end
