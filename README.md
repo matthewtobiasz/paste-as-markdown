@@ -1,6 +1,6 @@
 # Paste as Markdown
 
-A lightweight macOS menu bar utility that converts rich text on your clipboard to Markdown. Copy formatted text from any app, click the menu bar icon, and paste clean Markdown. Everything runs locally with no network access.
+A lightweight macOS menu bar utility that converts rich text on your clipboard to Markdown. Copy formatted text from any app, choose **Convert Clipboard to Markdown** from the menu bar icon, and paste clean Markdown. Everything runs locally with no network access.
 
 ## How it works
 
@@ -15,7 +15,7 @@ The app reads HTML from the macOS clipboard (with an RTF fallback), converts it 
 
 - Headings (`# h1` through `###### h6`)
 - Bold, italic, strikethrough
-- Links and images
+- Links and images (base64-embedded images are stripped; external URL images are preserved)
 - Ordered and unordered lists
 - GFM tables (via [turndown-plugin-gfm](https://github.com/mixmark-io/turndown-plugin-gfm))
 - Fenced code blocks and inline code
