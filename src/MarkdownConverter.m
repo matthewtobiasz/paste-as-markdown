@@ -68,6 +68,23 @@
         return nil;
     }
 
+    // Strip base64 data URIs from img src attributes — they can be several MB each
+    // and would produce unreadable markdown output. Replace with empty src.
+    NSRegularExpression *dataURIRegex =
+        [NSRegularExpression regularExpressionWithPattern:@"src=[\"']data:[^\"']*[\"']"
+                                                  options:NSRegularExpressionCaseInsensitive
+                                                    error:nil];
+    NSUInteger stripped = [dataURIRegex numberOfMatchesInString:html
+                                                        options:0
+                                                          range:NSMakeRange(0, html.length)];
+    if (stripped > 0) {
+        html = [dataURIRegex stringByReplacingMatchesInString:html
+                                                      options:0
+                                                        range:NSMakeRange(0, html.length)
+                                                 withTemplate:@"src=\"\""];
+        NSLog(@"[Paste as Markdown] Stripped %lu base64 data URI(s) from img tags", (unsigned long)stripped);
+    }
+
     // Run the conversion on the dedicated JS serial queue so we can enforce a
     // timeout while keeping JSContext access single-threaded (it is not thread-safe).
     __block JSValue *result = nil;

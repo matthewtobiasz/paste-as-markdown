@@ -229,6 +229,17 @@ static void testTableEmptyCells(MarkdownConverter *converter) {
     ASSERT_NOT_CONTAINS(result, @"<td", "table empty cell: no HTML td tag");
 }
 
+static void testImgDataURIStripped(MarkdownConverter *converter) {
+    // Base64 data URIs should be stripped before conversion to avoid multi-MB markdown output.
+    NSString *result = [converter convertHTMLToMarkdown:
+        @"<p>Hello</p>"
+         "<img src=\"data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAUA\" alt=\"screenshot\">"
+         "<p>World</p>"];
+    ASSERT_NOT_CONTAINS(result, @"data:image", "data URI: base64 blob stripped from output");
+    ASSERT_CONTAINS(result, @"Hello", "data URI: surrounding text preserved");
+    ASSERT_CONTAINS(result, @"World", "data URI: surrounding text preserved");
+}
+
 static void testConfluenceTableNoThead(MarkdownConverter *converter) {
     // Confluence copies tables with <td> everywhere — no <thead> or <th>.
     // The GFM plugin must still produce markdown, not pass through raw HTML.
@@ -445,6 +456,7 @@ int main(int argc, const char *argv[]) {
         testTableWithLink(converter);
         testTableEmptyCells(converter);
         testConfluenceTableNoThead(converter);
+        testImgDataURIStripped(converter);
 
         NSLog(@"--- JSContext Stability Tests ---");
         testRepeatedConversions(converter);
