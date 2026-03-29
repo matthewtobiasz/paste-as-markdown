@@ -4,8 +4,10 @@
 
 - (nullable NSString *)readHTML;
 - (nullable NSString *)readPlainText;
-/// Atomically clears the pasteboard and writes the given string.
-/// Returns YES on success. The pasteboard is only cleared if the write succeeds.
+/// Writes the given string to the pasteboard as plain text.
+/// Snapshots the existing pasteboard contents before clearing (required by NSPasteboard)
+/// and restores them if the write fails, so the original clipboard is not lost.
+/// Returns YES on success.
 - (BOOL)replaceClipboardWithMarkdown:(nonnull NSString *)markdown;
 
 @end
