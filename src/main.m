@@ -81,14 +81,16 @@
 
     NSString *html = [_clipboardHelper readHTML];
     if (!html) {
-        // No HTML/RTF — pass plain text through unchanged
-        NSString *plain = [_clipboardHelper readPlainText];
-        if (!plain) {
+        // No HTML/RTF on the clipboard. If plain text is present there's
+        // nothing to convert — leave the pasteboard completely untouched.
+        // Rewriting identical text would destroy every other flavor sitting
+        // alongside it (images, file references, custom app data) for zero
+        // benefit. Just signal "nothing to do" with the minus flash.
+        if ([_clipboardHelper readPlainText]) {
+            [self flashStatusIcon:@"minus"];
+        } else {
             [self flashStatusIcon:@"exclamationmark.triangle"];
-            return;
         }
-        BOOL ok = [_clipboardHelper replaceClipboardWithMarkdown:plain];
-        [self flashStatusIcon:ok ? @"minus" : @"xmark"];
         return;
     }
 

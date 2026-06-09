@@ -1,7 +1,7 @@
 var TurndownService = require('turndown');
 var gfm = require('turndown-plugin-gfm');
 
-var service = new TurndownService({
+var TURNDOWN_OPTIONS = {
   headingStyle: 'atx',
   hr: '---',
   bulletListMarker: '-',
@@ -10,10 +10,23 @@ var service = new TurndownService({
   emDelimiter: '*',
   strongDelimiter: '**',
   linkStyle: 'inlined'
-});
+};
 
+var service = new TurndownService(TURNDOWN_OPTIONS);
 service.use(gfm.gfm);
 service.remove(['script', 'style', 'noscript']);
+
+// Dedicated service for converting table cell contents. The confluenceTable
+// rule below needs to convert cell innerHTML to markdown, but calling
+// service.turndown() re-entrantly from inside one of its own replacement
+// functions is undocumented behavior in turndown and risks corrupting
+// in-flight conversion state. A separate instance makes cell conversion a
+// clean, independent call. It intentionally does NOT carry the
+// confluenceTable rule, so a (degenerate) nested table inside a cell can't
+// recurse.
+var cellService = new TurndownService(TURNDOWN_OPTIONS);
+cellService.use(gfm.gfm);
+cellService.remove(['script', 'style', 'noscript']);
 
 // Confluence and other rich editors produce tables with no <thead> or <th> —
 // every row uses <td>, even the header row. The GFM plugin only converts tables
@@ -34,17 +47,11 @@ service.addRule('confluenceTable', {
     if (!rowsNL || rowsNL.length === 0) return content;
     var rows = rowsNL;
 
-    function cellText(td) {
-      // Strip block-level wrappers (<p>, <div>) that wrap cell content so that
-      // inline markdown (bold, links) survives but the surrounding paragraph
-      // tags don't leak into the cell text.
-      return td.textContent.trim();
-    }
-
     function convertCell(td) {
-      // Re-run the turndown converter on the cell's innerHTML so that inline
-      // elements (strong, em, a) are converted to markdown rather than left as HTML.
-      return service.turndown(td.innerHTML).trim().replace(/\|/g, '\\|');
+      // Convert the cell's innerHTML so that inline elements (strong, em, a)
+      // become markdown rather than being left as HTML. Uses cellService —
+      // never the outer service — see comment above.
+      return cellService.turndown(td.innerHTML).trim().replace(/\|/g, '\\|');
     }
 
     function nodeListToArray(nl) {
@@ -68,7 +75,11 @@ service.addRule('confluenceTable', {
 });
 
 function convert(html) {
-  return service.turndown(html);
+  var md = service.turndown(html);
+  // Normalize non-breaking spaces to regular spaces. Apple's NSAttributedString
+  // HTML export (the RTF fallback path) and many web editors emit U+00A0 for
+  // ordinary spaces, which leaks invisible characters into the markdown.
+  return md.replace(/\u00A0/g, ' ');
 }
 
 module.exports = { convert: convert };

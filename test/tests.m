@@ -240,6 +240,30 @@ static void testImgDataURIStripped(MarkdownConverter *converter) {
     ASSERT_CONTAINS(result, @"World", "data URI: surrounding text preserved");
 }
 
+static void testNbspNormalized(MarkdownConverter *converter) {
+    // Apple's RTF→HTML export and many web editors emit U+00A0 for ordinary
+    // spaces; the converter normalizes them to regular spaces.
+    NSString *result = [converter convertHTMLToMarkdown:@"<p>foo&nbsp;bar</p>"];
+    ASSERT_EQUAL(result, @"foo bar", "nbsp: normalized to regular space");
+}
+
+static void testLargeDataURIStrippedBeforeSizeCheck(MarkdownConverter *converter) {
+    // A clipboard with one multi-MB inline image plus a little text must still
+    // convert: data URIs are stripped BEFORE the 5 MB cap is applied.
+    NSUInteger blobLen = 6 * 1024 * 1024;
+    NSMutableString *blob = [NSMutableString stringWithCapacity:blobLen];
+    for (NSUInteger i = 0; i < blobLen; i++) {
+        [blob appendString:@"A"];
+    }
+    NSString *html = [NSString stringWithFormat:
+        @"<p>Hello</p><img src=\"data:image/png;base64,%@\" alt=\"big\"><p>World</p>", blob];
+    NSString *result = [converter convertHTMLToMarkdown:html];
+    ASSERT_NOT_NIL(result, "large data URI: conversion still succeeds");
+    ASSERT_CONTAINS(result, @"Hello", "large data URI: text before image preserved");
+    ASSERT_CONTAINS(result, @"World", "large data URI: text after image preserved");
+    ASSERT_NOT_CONTAINS(result, @"data:image", "large data URI: blob stripped");
+}
+
 static void testConfluenceTableNoThead(MarkdownConverter *converter) {
     // Confluence copies tables with <td> everywhere — no <thead> or <th>.
     // The GFM plugin must still produce markdown, not pass through raw HTML.
@@ -280,11 +304,17 @@ static void testRepeatedConversions(MarkdownConverter *converter) {
 
 #pragma mark - ClipboardHelper Edge Case Tests
 
+static NSPasteboard *MakeTestPasteboard(void) {
+    // Private pasteboard so tests never clobber the user's real clipboard
+    // and never race with other processes (or other CI jobs) using it.
+    return [NSPasteboard pasteboardWithUniqueName];
+}
+
 static void testClipboardHTMLPreferredOverPlainText(void) {
     // When clipboard has both HTML and plain text, readHTML should return the HTML
-    ClipboardHelper *helper = [[ClipboardHelper alloc] init];
+    NSPasteboard *pb = MakeTestPasteboard();
+    ClipboardHelper *helper = [[ClipboardHelper alloc] initWithPasteboard:pb];
 
-    NSPasteboard *pb = [NSPasteboard generalPasteboard];
     [pb clearContents];
     // Write both types — apps like browsers typically put both on the clipboard
     [pb setString:@"<p>rich</p>" forType:NSPasteboardTypeHTML];
@@ -292,11 +322,13 @@ static void testClipboardHTMLPreferredOverPlainText(void) {
 
     NSString *html = [helper readHTML];
     ASSERT_EQUAL(html, @"<p>rich</p>", "clipboard prefers HTML over plain text");
+    [pb releaseGlobally];
 }
 
 static void testClipboardRTFFallback(void) {
     // When clipboard has RTF but no HTML, readHTML should convert RTF to HTML
-    ClipboardHelper *helper = [[ClipboardHelper alloc] init];
+    NSPasteboard *pb = MakeTestPasteboard();
+    ClipboardHelper *helper = [[ClipboardHelper alloc] initWithPasteboard:pb];
 
     // Create RTF data for "Hello" in bold
     NSAttributedString *attr = [[NSAttributedString alloc]
@@ -306,20 +338,20 @@ static void testClipboardRTFFallback(void) {
     NSData *rtfData = [attr RTFFromRange:NSMakeRange(0, attr.length)
                       documentAttributes:@{}];
 
-    NSPasteboard *pb = [NSPasteboard generalPasteboard];
     [pb clearContents];
     [pb setData:rtfData forType:NSPasteboardTypeRTF];
 
     NSString *html = [helper readHTML];
     ASSERT_NOT_NIL(html, "RTF fallback: returns non-nil HTML");
     ASSERT_CONTAINS(html, @"Hello", "RTF fallback: contains text content");
+    [pb releaseGlobally];
 }
 
 static void testClipboardFullRoundTrip(MarkdownConverter *converter) {
     // Integration test: put HTML on clipboard → read → convert → write → verify markdown
-    ClipboardHelper *helper = [[ClipboardHelper alloc] init];
+    NSPasteboard *pb = MakeTestPasteboard();
+    ClipboardHelper *helper = [[ClipboardHelper alloc] initWithPasteboard:pb];
 
-    NSPasteboard *pb = [NSPasteboard generalPasteboard];
     [pb clearContents];
     [pb setString:@"<h1>Title</h1><p>A <strong>bold</strong> paragraph.</p>"
           forType:NSPasteboardTypeHTML];
@@ -335,81 +367,87 @@ static void testClipboardFullRoundTrip(MarkdownConverter *converter) {
     NSString *result = [pb stringForType:NSPasteboardTypeString];
     ASSERT_CONTAINS(result, @"# Title", "round trip: has heading");
     ASSERT_CONTAINS(result, @"**bold**", "round trip: has bold");
+    [pb releaseGlobally];
 }
 
 #pragma mark - ClipboardHelper Tests
 
 static void testClipboardWriteRead(void) {
-    ClipboardHelper *helper = [[ClipboardHelper alloc] init];
+    NSPasteboard *pb = MakeTestPasteboard();
+    ClipboardHelper *helper = [[ClipboardHelper alloc] initWithPasteboard:pb];
     [helper replaceClipboardWithMarkdown:@"# Hello\n\nWorld"];
-    NSString *text = [[NSPasteboard generalPasteboard] stringForType:NSPasteboardTypeString];
+    NSString *text = [pb stringForType:NSPasteboardTypeString];
     ASSERT_EQUAL(text, @"# Hello\n\nWorld", "clipboard write/read plain text");
+    [pb releaseGlobally];
 }
 
 static void testClipboardHTMLRead(void) {
-    ClipboardHelper *helper = [[ClipboardHelper alloc] init];
+    NSPasteboard *pb = MakeTestPasteboard();
+    ClipboardHelper *helper = [[ClipboardHelper alloc] initWithPasteboard:pb];
 
-    NSPasteboard *pb = [NSPasteboard generalPasteboard];
     [pb clearContents];
     [pb setString:@"<h1>Test</h1>" forType:NSPasteboardTypeHTML];
 
     NSString *html = [helper readHTML];
     ASSERT_EQUAL(html, @"<h1>Test</h1>", "clipboard read HTML");
+    [pb releaseGlobally];
 }
 
 static void testClipboardEmptyRead(void) {
-    ClipboardHelper *helper = [[ClipboardHelper alloc] init];
+    NSPasteboard *pb = MakeTestPasteboard();
+    ClipboardHelper *helper = [[ClipboardHelper alloc] initWithPasteboard:pb];
 
-    NSPasteboard *pb = [NSPasteboard generalPasteboard];
     [pb clearContents];
     [pb setString:@"plain text only" forType:NSPasteboardTypeString];
 
     NSString *html = [helper readHTML];
     ASSERT_NIL(html, "clipboard returns nil when no HTML/RTF");
+    [pb releaseGlobally];
 }
 
 #pragma mark - Plain Text Fallback Tests
 
 static void testReadPlainText(void) {
-    ClipboardHelper *helper = [[ClipboardHelper alloc] init];
+    NSPasteboard *pb = MakeTestPasteboard();
+    ClipboardHelper *helper = [[ClipboardHelper alloc] initWithPasteboard:pb];
 
-    NSPasteboard *pb = [NSPasteboard generalPasteboard];
     [pb clearContents];
     [pb setString:@"just some text" forType:NSPasteboardTypeString];
 
     NSString *text = [helper readPlainText];
     ASSERT_EQUAL(text, @"just some text", "readPlainText returns plain text");
+    [pb releaseGlobally];
 }
 
 static void testReadPlainTextReturnsNilWhenEmpty(void) {
-    ClipboardHelper *helper = [[ClipboardHelper alloc] init];
+    NSPasteboard *pb = MakeTestPasteboard();
+    ClipboardHelper *helper = [[ClipboardHelper alloc] initWithPasteboard:pb];
 
-    NSPasteboard *pb = [NSPasteboard generalPasteboard];
     [pb clearContents];
 
     NSString *text = [helper readPlainText];
     ASSERT_NIL(text, "readPlainText returns nil on empty clipboard");
+    [pb releaseGlobally];
 }
 
-static void testPlainTextPassthroughRoundTrip(void) {
-    ClipboardHelper *helper = [[ClipboardHelper alloc] init];
+static void testPlainTextDetection(void) {
+    // The app no longer rewrites the clipboard when only plain text is present
+    // (rewriting destroys co-resident flavors). These primitives are what the
+    // app uses to detect that case: readHTML nil + readPlainText non-nil.
+    NSPasteboard *pb = MakeTestPasteboard();
+    ClipboardHelper *helper = [[ClipboardHelper alloc] initWithPasteboard:pb];
 
-    NSPasteboard *pb = [NSPasteboard generalPasteboard];
     [pb clearContents];
     [pb setString:@"already markdown **bold**" forType:NSPasteboardTypeString];
 
-    // readHTML should return nil (no HTML/RTF)
-    NSString *html = [helper readHTML];
-    ASSERT_NIL(html, "plain text passthrough: readHTML returns nil");
+    ASSERT_NIL([helper readHTML], "plain text detection: readHTML returns nil");
+    ASSERT_EQUAL([helper readPlainText], @"already markdown **bold**",
+                 "plain text detection: readPlainText returns text");
 
-    // readPlainText should return the text
-    NSString *plain = [helper readPlainText];
-    ASSERT_NOT_NIL(plain, "plain text passthrough: readPlainText returns text");
-
-    // Write it back and verify
-    [helper replaceClipboardWithMarkdown:plain];
+    // And the clipboard itself is untouched by detection
     NSString *result = [pb stringForType:NSPasteboardTypeString];
-    ASSERT_EQUAL(result, @"already markdown **bold**", "plain text passthrough: text unchanged");
+    ASSERT_EQUAL(result, @"already markdown **bold**", "plain text detection: clipboard unchanged");
+    [pb releaseGlobally];
 }
 
 #pragma mark - Main
@@ -457,6 +495,8 @@ int main(int argc, const char *argv[]) {
         testTableEmptyCells(converter);
         testConfluenceTableNoThead(converter);
         testImgDataURIStripped(converter);
+        testNbspNormalized(converter);
+        testLargeDataURIStrippedBeforeSizeCheck(converter);
 
         NSLog(@"--- JSContext Stability Tests ---");
         testRepeatedConversions(converter);
@@ -474,7 +514,7 @@ int main(int argc, const char *argv[]) {
         NSLog(@"--- Plain Text Fallback Tests ---");
         testReadPlainText();
         testReadPlainTextReturnsNilWhenEmpty();
-        testPlainTextPassthroughRoundTrip();
+        testPlainTextDetection();
 
         NSLog(@"=== Results: %d passed, %d failed ===", testsPassed, testsFailed);
 
