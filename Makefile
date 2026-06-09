@@ -3,7 +3,7 @@ BUNDLE = $(APP_NAME).app
 EXECUTABLE = paste-as-markdown
 
 CC = clang
-OBJC_FLAGS = -fobjc-arc -framework Cocoa -framework JavaScriptCore -mmacosx-version-min=11.0 -Isrc
+OBJC_FLAGS = -fobjc-arc -framework Cocoa -framework JavaScriptCore -framework ServiceManagement -mmacosx-version-min=11.0 -Isrc
 SRC = src/main.m src/MarkdownConverter.m src/ClipboardHelper.m
 TEST_SRC = test/tests.m src/MarkdownConverter.m src/ClipboardHelper.m
 

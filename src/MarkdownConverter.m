@@ -29,6 +29,7 @@ static const NSUInteger kMaxStrippedInputBytes = 5 * 1024 * 1024;
     JSContext *_context;
     JSValue *_convertFunction;
     dispatch_queue_t _jsQueue;
+    double _executionTimeLimit;
 }
 
 - (nullable instancetype)init {
@@ -41,9 +42,15 @@ static const NSUInteger kMaxStrippedInputBytes = 5 * 1024 * 1024;
 }
 
 - (nullable instancetype)initWithJSBundlePath:(NSString *)path {
+    return [self initWithJSBundlePath:path executionTimeLimit:kJSExecutionTimeLimitSeconds];
+}
+
+- (nullable instancetype)initWithJSBundlePath:(NSString *)path
+                           executionTimeLimit:(double)seconds {
     self = [super init];
     if (!self) return nil;
 
+    _executionTimeLimit = seconds;
     _jsQueue = dispatch_queue_create("com.pasteAsMarkdown.jsContext", DISPATCH_QUEUE_SERIAL);
     _context = [[JSContext alloc] init];
     _context.exceptionHandler = ^(JSContext *ctx, JSValue *exception) {
@@ -51,6 +58,11 @@ static const NSUInteger kMaxStrippedInputBytes = 5 * 1024 * 1024;
         // contain clipboard content passed as input to the converter.
         NSString *exceptionType = [exception[@"name"] toString] ?: @"unknown";
         NSLog(@"[Paste as Markdown] JS exception (%@) during conversion", exceptionType);
+        // Re-set the exception on the context so native callers can detect
+        // the failure via ctx.exception. Installing ANY custom handler
+        // replaces the default one (which did exactly this) — without this
+        // line every `_context.exception` check in this file is dead code.
+        ctx.exception = exception;
     };
 
     // Install JSC's execution watchdog. If a conversion runs past the limit
@@ -61,7 +73,7 @@ static const NSUInteger kMaxStrippedInputBytes = 5 * 1024 * 1024;
     // "terminate unconditionally when the limit is hit". The limit applies
     // per entry into JS, not cumulatively.
     JSContextGroupRef group = JSContextGetGroup([_context JSGlobalContextRef]);
-    JSContextGroupSetExecutionTimeLimit(group, kJSExecutionTimeLimitSeconds, NULL, NULL);
+    JSContextGroupSetExecutionTimeLimit(group, seconds, NULL, NULL);
 
     NSError *error = nil;
     NSString *jsCode = [NSString stringWithContentsOfFile:path
@@ -152,7 +164,7 @@ static const NSUInteger kMaxStrippedInputBytes = 5 * 1024 * 1024;
     if (_context.exception) {
         // Do not log the exception message — it may contain clipboard content.
         NSLog(@"[Paste as Markdown] Conversion failed with a JS exception (possibly the %.0fs watchdog)",
-              kJSExecutionTimeLimitSeconds);
+              _executionTimeLimit);
         _context.exception = nil;
         return nil;
     }

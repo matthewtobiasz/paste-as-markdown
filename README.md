@@ -9,6 +9,8 @@ A lightweight macOS menu bar utility that converts rich text on your clipboard t
 3. The icon flashes a checkmark (✓) on success
 4. Paste into your editor — you now have Markdown
 
+Optional: enable **Launch at Login** from the menu bar icon so the app is always ready (macOS 13+; uses Apple's `SMAppService`). You can change this at any time from the menu or in System Settings → General → Login Items.
+
 The app reads HTML from the macOS clipboard (with an RTF fallback), converts it using [turndown.js](https://github.com/mixmark-io/turndown) running inside Apple's JavaScriptCore framework, and writes the result back as plain text. No data leaves your machine.
 
 ## Supported conversions

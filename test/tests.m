@@ -302,13 +302,113 @@ static void testRepeatedConversions(MarkdownConverter *converter) {
     testsPassed++;
 }
 
-#pragma mark - ClipboardHelper Edge Case Tests
-
 static NSPasteboard *MakeTestPasteboard(void) {
     // Private pasteboard so tests never clobber the user's real clipboard
     // and never race with other processes (or other CI jobs) using it.
     return [NSPasteboard pasteboardWithUniqueName];
 }
+
+#pragma mark - Watchdog Tests
+
+static NSString *WriteTempJSBundle(NSString *contents) {
+    NSString *path = [NSTemporaryDirectory() stringByAppendingPathComponent:
+        [NSString stringWithFormat:@"watchdog-test-%@.js", [[NSUUID UUID] UUIDString]]];
+    [contents writeToFile:path atomically:YES encoding:NSUTF8StringEncoding error:nil];
+    return path;
+}
+
+static void testWatchdogTerminatesRunawayScript(void) {
+    // A convert() that spins forever on the first call, then behaves. Verifies:
+    // 1. the JSC execution watchdog actually interrupts runaway JS (nil result,
+    //    bounded wall time), and
+    // 2. the SAME converter instance remains fully usable afterward — i.e. the
+    //    serial queue is not wedged and the JSContext survived termination.
+    NSString *js = @"var calls = 0;\n"
+                   @"function convert(html) {\n"
+                   @"  calls++;\n"
+                   @"  if (calls === 1) { while (true) {} }\n"
+                   @"  return 'recovered:' + html;\n"
+                   @"}\n";
+    NSString *path = WriteTempJSBundle(js);
+
+    // 1-second limit so the test stays fast; production uses 10s.
+    MarkdownConverter *converter = [[MarkdownConverter alloc] initWithJSBundlePath:path
+                                                                executionTimeLimit:1.0];
+    ASSERT_NOT_NIL(converter, "watchdog: converter initializes with test bundle");
+    if (!converter) {
+        [[NSFileManager defaultManager] removeItemAtPath:path error:nil];
+        return;
+    }
+
+    NSDate *start = [NSDate date];
+    NSString *first = [converter convertHTMLToMarkdown:@"<p>x</p>"];
+    NSTimeInterval elapsed = -[start timeIntervalSinceNow];
+
+    ASSERT_NIL(first, "watchdog: runaway conversion returns nil");
+    if (elapsed < 5.0) {
+        testsPassed++;
+    } else {
+        testsFailed++;
+        NSLog(@"FAIL: watchdog: termination took %.1fs (limit was 1s)", elapsed);
+    }
+
+    NSString *second = [converter convertHTMLToMarkdown:@"<p>y</p>"];
+    ASSERT_EQUAL(second, @"recovered:<p>y</p>", "watchdog: converter usable after termination");
+
+    [[NSFileManager defaultManager] removeItemAtPath:path error:nil];
+}
+
+#pragma mark - Input Guard Tests
+
+static void testDataURIVariantsStripped(MarkdownConverter *converter) {
+    // The stripping regex must handle double-quoted, single-quoted, and
+    // unquoted src attribute values.
+    NSString *singleQuoted = [converter convertHTMLToMarkdown:
+        @"<p>before</p><img src='data:image/png;base64,AAAA' alt=\"x\"><p>after</p>"];
+    ASSERT_NOT_CONTAINS(singleQuoted, @"data:image", "data URI variants: single-quoted stripped");
+    ASSERT_CONTAINS(singleQuoted, @"before", "data URI variants: single-quoted keeps text");
+
+    NSString *unquoted = [converter convertHTMLToMarkdown:
+        @"<p>before</p><img src=data:image/png;base64,BBBB alt=x><p>after</p>"];
+    ASSERT_NOT_CONTAINS(unquoted, @"data:image", "data URI variants: unquoted stripped");
+    ASSERT_CONTAINS(unquoted, @"after", "data URI variants: unquoted keeps text");
+
+    // External URLs must NOT be stripped
+    NSString *external = [converter convertHTMLToMarkdown:
+        @"<img src=\"https://example.com/pic.png\" alt=\"photo\">"];
+    ASSERT_CONTAINS(external, @"https://example.com/pic.png", "data URI variants: external URL preserved");
+}
+
+static void testOversizedInputRejected(MarkdownConverter *converter) {
+    // Input over the 50 MB absolute cap is rejected outright — even the
+    // data-URI stripping pass shouldn't run on something that size.
+    NSString *huge = [@"" stringByPaddingToLength:(51 * 1024 * 1024)
+                                       withString:@"<p>a</p>"
+                                  startingAtIndex:0];
+    ASSERT_NIL([converter convertHTMLToMarkdown:huge], "oversized input: rejected at hard cap");
+}
+
+static void testReplaceClearsOtherFlavors(void) {
+    // Documents intended behavior: after a successful conversion the
+    // pasteboard holds ONLY the plain-text markdown — the original rich
+    // flavors are intentionally replaced.
+    NSPasteboard *pb = MakeTestPasteboard();
+    ClipboardHelper *helper = [[ClipboardHelper alloc] initWithPasteboard:pb];
+
+    [pb clearContents];
+    [pb setString:@"<p>rich</p>" forType:NSPasteboardTypeHTML];
+    [pb setString:@"plain" forType:NSPasteboardTypeString];
+
+    BOOL ok = [helper replaceClipboardWithMarkdown:@"converted"];
+    ASSERT_NOT_NIL(ok ? @"y" : nil, "replace flavors: write succeeds");
+    ASSERT_EQUAL([pb stringForType:NSPasteboardTypeString], @"converted",
+                 "replace flavors: plain text is the markdown");
+    ASSERT_NIL([pb stringForType:NSPasteboardTypeHTML],
+               "replace flavors: stale HTML flavor removed");
+    [pb releaseGlobally];
+}
+
+#pragma mark - ClipboardHelper Edge Case Tests
 
 static void testClipboardHTMLPreferredOverPlainText(void) {
     // When clipboard has both HTML and plain text, readHTML should return the HTML
@@ -500,6 +600,14 @@ int main(int argc, const char *argv[]) {
 
         NSLog(@"--- JSContext Stability Tests ---");
         testRepeatedConversions(converter);
+
+        NSLog(@"--- Watchdog Tests ---");
+        testWatchdogTerminatesRunawayScript();
+
+        NSLog(@"--- Input Guard Tests ---");
+        testDataURIVariantsStripped(converter);
+        testOversizedInputRejected(converter);
+        testReplaceClearsOtherFlavors();
 
         NSLog(@"--- ClipboardHelper Tests ---");
         testClipboardWriteRead();

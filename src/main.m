@@ -1,8 +1,9 @@
 #import <Cocoa/Cocoa.h>
+#import <ServiceManagement/ServiceManagement.h>
 #import "MarkdownConverter.h"
 #import "ClipboardHelper.h"
 
-@interface AppDelegate : NSObject <NSApplicationDelegate>
+@interface AppDelegate : NSObject <NSApplicationDelegate, NSMenuDelegate>
 @end
 
 @implementation AppDelegate {
@@ -10,6 +11,7 @@
     NSImage *_defaultIcon;
     MarkdownConverter *_converter;
     ClipboardHelper *_clipboardHelper;
+    NSMenuItem *_launchAtLoginItem;
 }
 
 - (void)applicationDidFinishLaunching:(NSNotification *)notification {
@@ -51,6 +53,17 @@
 
     [menu addItem:[NSMenuItem separatorItem]];
 
+    // Launch at Login uses SMAppService, which requires macOS 13. On older
+    // systems the item is simply absent (the app itself still supports 11+).
+    if (@available(macOS 13.0, *)) {
+        _launchAtLoginItem = [[NSMenuItem alloc] initWithTitle:@"Launch at Login"
+                                                        action:@selector(toggleLaunchAtLogin:)
+                                                 keyEquivalent:@""];
+        [_launchAtLoginItem setTarget:self];
+        [menu addItem:_launchAtLoginItem];
+        [menu addItem:[NSMenuItem separatorItem]];
+    }
+
     NSMenuItem *aboutItem = [[NSMenuItem alloc] initWithTitle:@"About Paste as Markdown"
                                                       action:@selector(showAbout:)
                                                keyEquivalent:@""];
@@ -63,6 +76,11 @@
                                                      action:@selector(terminate:)
                                               keyEquivalent:@"q"];
     [menu addItem:quitItem];
+
+    // Refresh the Launch at Login checkmark each time the menu opens — the
+    // user can toggle login items behind our back in System Settings.
+    menu.delegate = self;
+    [self refreshLaunchAtLoginState];
 
     _statusItem.menu = menu;
 
@@ -102,6 +120,44 @@
     // Clipboard is only cleared here, once we have a confirmed result
     BOOL ok = [_clipboardHelper replaceClipboardWithMarkdown:markdown];
     [self flashStatusIcon:ok ? @"checkmark" : @"xmark"];
+}
+
+- (void)menuWillOpen:(NSMenu *)menu {
+    [self refreshLaunchAtLoginState];
+}
+
+- (void)refreshLaunchAtLoginState {
+    if (@available(macOS 13.0, *)) {
+        if (!_launchAtLoginItem) return;
+        _launchAtLoginItem.state =
+            (SMAppService.mainAppService.status == SMAppServiceStatusEnabled)
+                ? NSControlStateValueOn
+                : NSControlStateValueOff;
+    }
+}
+
+- (void)toggleLaunchAtLogin:(id)sender {
+    if (@available(macOS 13.0, *)) {
+        SMAppService *service = SMAppService.mainAppService;
+        NSError *error = nil;
+
+        if (service.status == SMAppServiceStatusEnabled) {
+            if (![service unregisterAndReturnError:&error]) {
+                NSLog(@"[Paste as Markdown] Failed to disable launch at login: %@", error);
+            }
+        } else {
+            if (![service registerAndReturnError:&error]) {
+                NSLog(@"[Paste as Markdown] Failed to enable launch at login: %@", error);
+            }
+            // If the user previously denied this app in System Settings,
+            // registration lands in "requires approval" — send them to the
+            // Login Items pane so they can flip the switch.
+            if (service.status == SMAppServiceStatusRequiresApproval) {
+                [SMAppService openSystemSettingsLoginItems];
+            }
+        }
+        [self refreshLaunchAtLoginState];
+    }
 }
 
 - (void)showAbout:(id)sender {
